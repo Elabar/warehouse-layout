@@ -7,7 +7,27 @@
       integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0="
       crossorigin="anonymous"
     ></script>
-    <title>My first three.js app</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+      integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z"
+      crossorigin="anonymous"
+    />
+    <script
+      src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"
+      integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"
+      integrity="sha384-LtrjvnR4Twt/qOuYxE721u19sVFLVSA4hf/rRt6PrZTmiPltdZcI7q7PXQBYTKyf"
+      crossorigin="anonymous"
+    ></script>
+    <title>Warehouse Layout</title>
     <style>
       body {
         margin: 0;
@@ -22,6 +42,8 @@
       import * as THREE from "https://unpkg.com/three/build/three.module.js";
       import { OrbitControls } from "https://unpkg.com/three/examples/jsm/controls/OrbitControls.js";
       var cells = [];
+      var selectedLanes = [];
+      var selectedRack = "";
       const lanes = [
         {
           lane: "1",
@@ -121,7 +143,8 @@
         index,
         extra,
         depthStart,
-        depthEnd
+        depthEnd,
+        lane
       ) {
         for (let i = 1; i <= floor; i++) {
           var material = new THREE.LineBasicMaterial({
@@ -227,22 +250,57 @@
           cube.position.z = depthStart + 1;
           cube.userData.extra = extra;
           cube.userData.actualFloor = i;
+          cube.userData.lane = lane;
           cells.push(cube);
           scene.add(cube);
           scene.add(line);
         }
       };
 
-      var drawColumn = function (col, colIndex, curLane, size, laneRack, colCode) {
+      var drawColumn = function (
+        col,
+        colIndex,
+        curLane,
+        size,
+        laneRack,
+        colCode,
+        lane
+      ) {
         let depthStart = laneRack[0];
         let depthEnd = laneRack[1];
         for (let i = 0; i < col.length; i++) {
           let extra = {
             ...col[i],
-            colCode
-          }
-          drawRack(col[i].floor, size, i, extra, depthStart, depthEnd);
+            colCode,
+          };
+          drawRack(col[i].floor, size, i, extra, depthStart, depthEnd, lane);
         }
+      };
+
+      var drawLaneText = function (i, end, space) {
+        var loader = new THREE.FontLoader();
+
+        loader.load("fonts/helvetiker.typeface.json", function (font) {
+          var fontSize = 1;
+          var lane = new THREE.TextGeometry(`Lane ${i}`, {
+            font: font,
+            size: fontSize,
+            height: 0.1,
+          });
+
+          var textMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+          });
+
+          var mesh = new THREE.Mesh(lane, textMaterial);
+          mesh.position.x = -5;
+          mesh.position.z = end - fontSize / 2 + space / 2;
+          // mesh.position.z = size + (i - 1) * (size + space) + space / 2;
+          mesh.rotation.x = -1.5708;
+          mesh.rotation.z = 3.14159;
+
+          scene.add(mesh);
+        });
       };
 
       var drawLane = function (lanes) {
@@ -260,13 +318,31 @@
                 (curLane - 1) * laneGap,
                 (curLane - 1) * laneGap + depth,
               ];
-              drawColumn(col.racks, colIndex, curLane, size, laneRack, col.column);
+              drawLaneText(lanes[i].lane, laneRack[1], space);
+
+              drawColumn(
+                col.racks,
+                colIndex,
+                curLane,
+                size,
+                laneRack,
+                col.column,
+                lanes[i].lane
+              );
             } else {
               let laneRack = [
                 (curLane - 1) * laneGap + depth + space,
                 (curLane - 1) * laneGap + depth * 2 + space,
               ];
-              drawColumn(col.racks, colIndex, curLane, size, laneRack, col.column);
+              drawColumn(
+                col.racks,
+                colIndex,
+                curLane,
+                size,
+                laneRack,
+                col.column,
+                lanes[i].lane
+              );
             }
           });
           curLane++;
@@ -275,14 +351,159 @@
 
       var scene = new THREE.Scene();
       var camera = new THREE.PerspectiveCamera(
-        75,
+        55,
         window.innerWidth / window.innerHeight,
         1,
         1000
       );
-      var renderer = new THREE.WebGLRenderer({ antialias: true });
+
+      camera.position.x = 35;
+      camera.position.y = 35;
+
+      function checkLanes() {
+        var checkedLanes = document.getElementsByClassName("LaneOption");
+        var newSelectedLanes = [];
+        for (var i = 0; i < checkedLanes.length; i++) {
+          if (checkedLanes[i].checked) {
+            newSelectedLanes.push(i + 1);
+          }
+        }
+        selectedLanes = newSelectedLanes;
+        if (newSelectedLanes.length > 0) {
+          let filteredCellsByLanes = cells.filter((cell) => {
+            return newSelectedLanes.includes(parseInt(cell.userData.lane));
+          });
+          filteredCellsByLanes.map((v, i) => {
+            var material = new THREE.MeshBasicMaterial({ color: 0xff8500 });
+            filteredCellsByLanes[i].material = material;
+          });
+        } else {
+          cells.map((v, i) => {
+            var material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            cells[i].material = material;
+          });
+        }
+      }
+
+      var card = document.createElement("div");
+      var collapsebtn = document.createElement("button");
+      var collapseContent = document.createElement("div");
+      var collapseContentContainer = document.createElement("div");
+
+      var text = document.createElement("span");
+      var text2 = document.createElement("span");
+
+      // card 1 style
+      card.className = "card card-body";
+      card.style.position = "absolute";
+      card.style.display = "flex";
+      card.style.justifyContent = "center";
+      card.style.alignItems = "center";
+      card.style.textAlign = "center";
+      card.style.flexWrap = "wrap";
+      card.style.width = parseInt(window.innerWidth * 0.2) + "px";
+      card.style.height = parseInt(window.innerHeight * 0.05) + "px";
+      card.style.top = 200 + "px";
+      card.style.left = 200 + "px";
+
+      //collapsebtn style
+      collapsebtn.className = "btn btn-primary";
+      collapsebtn.type = "button";
+      collapsebtn.setAttribute("data-toggle", "collapse");
+      collapsebtn.setAttribute("data-target", "#collapseContent");
+      collapsebtn.setAttribute("aria-expanded", "false");
+      collapsebtn.setAttribute("aria-controls", "collapseContent");
+      collapsebtn.style.position = "absolute";
+      collapsebtn.style.display = "flex";
+      collapsebtn.style.justifyContent = "center";
+      collapsebtn.style.alignItems = "center";
+      collapsebtn.style.textAlign = "center";
+      collapsebtn.style.flexWrap = "wrap";
+      collapsebtn.style.width = parseInt(window.innerWidth * 0.2) + "px";
+      collapsebtn.style.height = parseInt(window.innerHeight * 0.05) + "px";
+      collapsebtn.style.top = 200 + "px";
+      collapsebtn.style.right = 200 + "px";
+
+      //collapseContent style
+      collapseContent.className = "collapse";
+      collapseContent.id = "collapseContent";
+      collapseContent.style.position = "absolute";
+      collapseContent.style.width = parseInt(window.innerWidth * 0.2) + "px";
+      collapseContent.style.top =
+        200 + parseInt(window.innerHeight * 0.05) + "px";
+      collapseContent.style.right = 200 + "px";
+
+      //collapseContentContainer style
+      collapseContentContainer.className = "card card-body";
+      collapseContentContainer.style.width =
+        parseInt(window.innerWidth * 0.2) + "px";
+
+      //text style
+      text2.style.fontSize = parseInt(window.innerWidth * 0.013) + "px";
+      text2.style.fontFamily = "Roboto";
+      text2.style.fontWeight = "bold";
+      text2.innerHTML = `Filter Options`;
+
+      text.style.fontSize = parseInt(window.innerWidth * 0.013) + "px";
+      text.style.fontFamily = "Roboto";
+      text.style.fontWeight = "bold";
+      text.innerHTML = `Rack : ${"not selected"}`;
+
+      //lanes
+      var laneGroup = document.createElement("div");
+      var laneGroupTitle = document.createElement("p");
+      var laneGroupContainer = document.createElement("div");
+      var laneGroupInnerContainer = document.createElement("div");
+      laneGroupContainer.className = "container";
+      laneGroupInnerContainer.className = "row";
+
+      laneGroupTitle.innerHTML = "Lanes";
+      laneGroupTitle.style.fontSize =
+        parseInt(window.innerWidth * 0.011) + "px";
+      laneGroupTitle.style.fontFamily = "Roboto";
+      laneGroupTitle.style.fontWeight = "bold";
+      laneGroup.style.padding = 5 + "px";
+      laneGroup.style.margin = 5 + "px";
+
+      lanes.map((lane) => {
+        var el = lane.lane;
+        var newCol = document.createElement("div");
+        newCol.className = "col-sm form-check";
+        var selectBox = document.createElement("input");
+        selectBox.className = "LaneOption";
+        selectBox.type = "checkbox";
+        selectBox.id = `Lane${el}`;
+        selectBox.style.height = parseInt(window.innerHeight * 0.013) + "px";
+        selectBox.style.width = parseInt(window.innerWidth * 0.013) + "px";
+        selectBox.onclick = checkLanes;
+        var selectBoxLabel = document.createElement("label");
+        selectBoxLabel.className = "form-check-label";
+        selectBoxLabel.htmlFor = `Lane${el}`;
+        selectBoxLabel.innerHTML = `Lane ${el}`;
+        selectBoxLabel.style.fontSize =
+          parseInt(window.innerWidth * 0.013) + "px";
+        newCol.appendChild(selectBox);
+        newCol.appendChild(selectBoxLabel);
+        laneGroupInnerContainer.appendChild(newCol);
+      });
+
+      laneGroup.appendChild(laneGroupTitle);
+      laneGroupContainer.appendChild(laneGroupInnerContainer);
+      laneGroup.appendChild(laneGroupContainer);
+      collapseContentContainer.appendChild(laneGroup);
+
+      card.appendChild(text);
+      collapsebtn.appendChild(text2);
+      collapseContent.appendChild(collapseContentContainer);
+
+      document.body.appendChild(card);
+      document.body.appendChild(collapsebtn);
+      document.body.appendChild(collapseContent);
+
+      var renderer = new THREE.WebGLRenderer({ antialias: false });
       renderer.domElement.addEventListener("click", onDocumentMouseDown, true);
       var controls = new OrbitControls(camera, renderer.domElement);
+
       function onDocumentMouseDown(event) {
         event.preventDefault();
         var mouse = new THREE.Vector2();
@@ -292,7 +513,7 @@
         raycaster.setFromCamera(mouse, camera);
         var intersects = raycaster.intersectObjects(cells);
         if (intersects.length > 0) {
-          let code = `CHR-${intersects[0].object.userData.extra.colCode}-${intersects[0].object.userData.extra.row}-${intersects[0].object.userData.actualFloor}`
+          let code = `CHR-${intersects[0].object.userData.extra.colCode}-${intersects[0].object.userData.extra.row}-${intersects[0].object.userData.actualFloor}`;
           console.log(code);
         }
       }
@@ -303,21 +524,42 @@
         mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         var raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(mouse, camera);
+        var notFilteredCells = cells;
+        var filteredCells = cells;
+
         var intersects = raycaster.intersectObjects(cells);
-        cells.map((v, i) => {
+
+        if (selectedLanes.length > 0) {
+          notFilteredCells = notFilteredCells.filter((cell) => {
+            return !selectedLanes.includes(parseInt(cell.userData.lane));
+          });
+          filteredCells = filteredCells.filter((cell) => {
+            return selectedLanes.includes(parseInt(cell.userData.lane));
+          });
+          filteredCells.map((v, i) => {
+            var material = new THREE.MeshBasicMaterial({ color: 0xff8500 });
+            filteredCells[i].material = material;
+          });
+        }
+        notFilteredCells.map((v, i) => {
           var material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-          cells[i].material = material;
+          notFilteredCells[i].material = material;
         });
+
         if (intersects.length > 0) {
           $("html,body").css("cursor", "pointer");
-          let first = intersects[0]
+          let first = intersects[0];
           let index = cells.findIndex(
-              (e) => first.object.geometry.uuid === e.geometry.uuid
-            );
-            var material = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-            cells[index].material = material;
+            (e) => first.object.geometry.uuid === e.geometry.uuid
+          );
+          var material = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+          cells[index].material = material;
+          let code = `CHR-${intersects[0].object.userData.extra.colCode}-${intersects[0].object.userData.extra.row}-${intersects[0].object.userData.actualFloor}`;
+          selectedRack = code;
+          text.innerHTML = `Rack : ${selectedRack}`;
         } else {
           $("html,body").css("cursor", "default");
+          text.innerHTML = `Rack : ${"Not Selected"}`;
         }
       }
       renderer.setSize(window.innerWidth, window.innerHeight);
