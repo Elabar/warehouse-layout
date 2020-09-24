@@ -268,11 +268,14 @@
       ) {
         let depthStart = laneRack[0];
         let depthEnd = laneRack[1];
+        drawColumnText(colCode, colIndex, laneRack[0]);
+
         for (let i = 0; i < col.length; i++) {
           let extra = {
             ...col[i],
             colCode,
           };
+
           drawRack(col[i].floor, size, i, extra, depthStart, depthEnd, lane);
         }
       };
@@ -296,6 +299,30 @@
           mesh.position.x = -5;
           mesh.position.z = end - fontSize / 2 + space / 2;
           // mesh.position.z = size + (i - 1) * (size + space) + space / 2;
+          mesh.rotation.x = -1.5708;
+          mesh.rotation.z = 3.14159;
+
+          scene.add(mesh);
+        });
+      };
+
+      var drawColumnText = function (i, index, start) {
+        var loader = new THREE.FontLoader();
+        loader.load("fonts/helvetiker.typeface.json", function (font) {
+          var fontSize = 0.7;
+          var lane = new THREE.TextGeometry(`${i}`, {
+            font: font,
+            size: fontSize,
+            height: 0.1,
+          });
+
+          var textMaterial = new THREE.MeshBasicMaterial({
+            color: 0x5a5a5a,
+          });
+
+          var mesh = new THREE.Mesh(lane, textMaterial);
+          mesh.position.x = -3;
+          mesh.position.z = (start + fontSize) ;
           mesh.rotation.x = -1.5708;
           mesh.rotation.z = 3.14159;
 
